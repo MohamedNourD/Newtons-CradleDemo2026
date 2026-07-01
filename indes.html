@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>مهد نيوتن - مختبر علمي متقدم</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="split-divider"></div>
+    
+    <div id="label-left" class="split-label">عرض تصيير واقعي</div>
+    <div id="label-right" class="split-label">تراكب تحليلي علمي</div>
+    
+    <div id="edu-overlay">رسالة تعليمية</div>
+    <div id="onboarding-hint">انقر واسحب الكرات الخارجية للتفاعل</div>
+
+    <div id="mode-tabs" class="glass-panel">
+        <button class="tab-btn active" data-mode="realistic">واقعي</button>
+        <button class="tab-btn" data-mode="energy">تدفق الطاقة</button>
+        <button class="tab-btn" data-mode="forces">القوى والشبكة</button>
+        <button class="tab-btn" data-mode="debug">تحليل شامل</button>
+        <button class="tab-btn" data-mode="split">شاشة مقسومة</button>
+    </div>
+
+    <div id="settings-panel" class="glass-panel">
+        <h2 id="legend-title">إعدادات المحاكاة</h2>
+        <div id="legend-content"></div>
+        
+        <div class="toggles-group">
+            <div style="margin-bottom: 8px;">
+                <label class="data-label" style="display:block;">نمط بيئة المختبر</label>
+                <select id="sel-physics-mode" class="select-mode">
+                    <option value="stabilized">الوضع المستقر (تصحيح الطاقة)</option>
+                    <option value="pure">وضع الفيزياء البحتة (انحراف طبيعي)</option>
+                </select>
+            </div>
+            
+            <label class="toggle-row">
+                <span>إظهار متجهات السرعة</span>
+                <input type="checkbox" id="tog-vel" checked>
+            </label>
+            <label class="toggle-row">
+                <span>إظهار الزخم (p=mv)</span>
+                <input type="checkbox" id="tog-mom" checked>
+            </label>
+            <label class="toggle-row">
+                <span>إظهار متجهات القوة</span>
+                <input type="checkbox" id="tog-force" checked>
+            </label>
+            <label class="toggle-row">
+                <span>إظهار أعمدة الطاقة</span>
+                <input type="checkbox" id="tog-bars" checked>
+            </label>
+            <label class="toggle-row">
+                <span>إظهار انتشار الموجات</span>
+                <input type="checkbox" id="tog-net" checked>
+            </label>
+        </div>
+    </div>
+
+    <div id="data-panel" class="glass-panel">
+        
+        <div class="data-section">
+            <div class="section-header">
+                <h3>الكينماتيكا (علم الحركة)</h3>
+                <span class="id-badge">معرف الكرة: <span id="dp-id">0</span></span>
+            </div>
+            <div class="data-grid">
+                <div class="data-item"><span class="data-label">الزاوية (θ)</span><span class="data-value" id="dp-theta">0.000°</span></div>
+                <div class="data-item"><span class="data-label">السرعة الزاوية (ω)</span><span class="data-value" id="dp-omega">0.000 rad/s</span></div>
+                <div class="data-item"><span class="data-label">السرعة الخطية</span><span class="data-value" id="dp-vel">0.000 m/s</span></div>
+                <div class="data-item"><span class="data-label">الزخم (p)</span><span class="data-value" id="dp-mom" style="color:var(--mom-color)">0.000 kg·m/s</span></div>
+            </div>
+        </div>
+        
+        <div class="data-section" style="border-top: 1px solid var(--border); padding-top: 15px;">
+            <h3>ديناميكا النظام الحرارية</h3>
+            <div class="data-grid">
+                <div class="data-item"><span class="data-label">الطاقة الحركية (KE)</span><span class="data-value" id="dp-sys-ke" style="color:var(--ke-color)">0.000 J</span></div>
+                <div class="data-item"><span class="data-label">طاقة الوضع (PE)</span><span class="data-value" id="dp-sys-pe" style="color:var(--pe-color)">0.000 J</span></div>
+                <div class="data-item"><span class="data-label">الطاقة الميكانيكية الكلية</span><span class="data-value" id="dp-sys-total" style="color:var(--te-color)">0.000 J</span></div>
+                <div class="data-item" id="dev-container"><span class="data-label">انحراف حفظ الطاقة</span><span class="data-value" id="dp-sys-dev">0.000 %</span></div>
+            </div>
+            
+            <div id="energy-graph-container">
+                <div class="graph-btn-group">
+                    <button class="g-btn active" id="gb-system">النظام</button>
+                    <button class="g-btn" id="gb-ball">الكرة <span id="gb-id">0</span></button>
+                </div>
+                <canvas id="energy-canvas"></canvas>
+                <div class="graph-ui">
+                    <span style="color:var(--te-color)">■ الطاقة الكلية</span>
+                    <span style="color:var(--pe-color)">■ طاقة الوضع</span>
+                    <span style="color:var(--ke-color)">■ الطاقة الحركية</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ui-container" class="glass-panel">
+        <div class="control-group">
+            <button class="c-btn" id="btn-play">⏸ إيقاف مؤقت</button>
+            <button class="c-btn" id="btn-step">⏭ خطوة</button>
+            <select class="c-btn" id="sel-speed">
+                <option value="1.0">⏱ 1.0x</option>
+                <option value="0.5">⏱ 0.5x</option>
+                <option value="0.25">⏱ 0.25x</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <button class="c-btn" id="btn-demo1">كرة 1</button>
+            <button class="c-btn" id="btn-demo2">كرتان</button>
+            <button class="c-btn" id="btn-demo3">3 كرات</button>
+        </div>
+        
+        <div class="control-group">
+            <button class="c-btn danger" id="btn-reset">إعادة ضبط</button>
+        </div>
+    </div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
