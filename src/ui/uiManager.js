@@ -26,9 +26,13 @@ export class UIManager {
             eduOverlay: document.getElementById('edu-overlay'),
             hint: document.getElementById('onboarding-hint')
         };
-
         this.bindEvents();
         this.setDefaultLegend();
+        // أضف هذين السطرين في نهاية الـ constructor داخل ملف src/ui/uiManager.js
+        const physicsModeSelect = document.getElementById('sel-physics-mode');
+        if (physicsModeSelect) {
+            STATE.optConserve = (physicsModeSelect.value === 'stabilized');
+        }
     }
 
     bindEvents() {

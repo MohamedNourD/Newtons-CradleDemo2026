@@ -5,7 +5,7 @@ import { STATE } from '../core/state.js';
 export class AnomalousPhysicsEngine {
     constructor(audioEngine, anomalyCase = 1) {
         this.audio = audioEngine;
-        this.anomalyCase = anomalyCase; // 1: أوزان مختلفة، 2: أطوال خيوط مختلفة، 3: حركة شاذة (سعات غير خطية)
+        this.anomalyCase = anomalyCase; 
         this.balls = [];
         this.collisionEvents = [];
         this.initCase();
@@ -18,37 +18,79 @@ export class AnomalousPhysicsEngine {
         for (let i = 0; i < CONFIG.N; i++) {
             const pivotX = (i - (CONFIG.N - 1) / 2) * CONFIG.D;
             
-            // تخصيص الافتراضيات لكل حالة شاذة
             let mass = CONFIG.MASS;
             let length = CONFIG.L;
             let theta = 0;
+            let restitution = 1.0; 
+            let magneticCharge = 0.0; 
+            let gravityLocal = CONFIG.GRAVITY;
 
+            // كينماتيكا فضائية متجهية نقية ثلاثية الأبعاد
+            let initPos = new THREE.Vector3(pivotX, CONFIG.PIVOT_Y - length, 0);
+            let initVel = new THREE.Vector3(0, 0, 0);
+
+            // تحسين معايير الحالات الفيزيائية (1-7) لتعطي أوضح وأدق استجابة ميكانيكية
             if (this.anomalyCase === 1) {
-                // الحالة 1: كرات مختلفة الوزن (تدرج تصاعدي في الكتلة)
+                // الحالة 1: تدرج كتل حقيقي (الكرة الأخيرة أثقل بـ 4 أضعاف لتوضيح ارتداد الزخم العكسي)
                 mass = CONFIG.MASS * (1.0 + i * 0.75); 
-                if (i === 0) theta = -Math.PI / 4; // إزاحة الكرة الأولى
+                if (i === 0) theta = -Math.PI / 4;
             } else if (this.anomalyCase === 2) {
-                // الحالة 2: أطوال خيوط مختلفة (بندول ويف / موجي جليلي)
-                // اختلاف الأطوال يغير التردد الطبيعي: T = 2*pi*sqrt(L/g)
-                length = CONFIG.L - (i * 0.8); 
-                // نزيحهم معاً لنرى تباعد الأطوار الموجي التشعبي لاحقاً
+                // الحالة 2: بندول ويف الموجي (حساب الأطوال بدقة لإنتاج موجة توافقية متزامنة ومتداخلة بصرياً)
+                length = CONFIG.L - (i * 0.5); 
                 theta = -Math.PI / 6; 
             } else if (this.anomalyCase === 3) {
-                // الحالة 3: حركة وزوايا شاذة (سعات ضخمة غير خطية تصطدم في أوقات غير متزامنة)
-                mass = CONFIG.MASS;
-                length = CONFIG.L;
-                if (i === 0) theta = -Math.PI / 3;  // سعة قصوى يسار
-                if (i === CONFIG.N - 1) theta = Math.PI / 4; // سعة يمين متداخلة لخلخلة التزامن
+                // الحالة 3: حركة فوضوية متداخلة السعات بزوايا متقابلة
+                if (i === 0) theta = -Math.PI / 3;
+                if (i === CONFIG.N - 1) theta = Math.PI / 4;
+            } else if (this.anomalyCase === 4) {
+                // الحالة 4: تصادم لدن مشتت للطاقة الحرارية (امتصاص النبض الميكانيكي)
+                restitution = Math.max(0.0, 0.95 - (i * 0.22)); 
+                if (i === 0) theta = -Math.PI / 4;
+            } else if (this.anomalyCase === 5) {
+                // الحالة 5: الحقل المغناطيسي المتنافر (قوة تنافر ناعمة ومتزنة تمنع التلامس)
+                magneticCharge = 8.0; 
+                if (i === 0) theta = -Math.PI / 4;
+            } else if (this.anomalyCase === 6) {
+                // الحالة 6: تدرج الجاذبية الموضعي اللامركزي g(x)
+                gravityLocal = CONFIG.GRAVITY * (1.0 + (pivotX / 8.0));
+                theta = -Math.PI / 5; 
+            } else if (this.anomalyCase === 7) {
+                // الحالة 7: البندول الكروي الحقيقي ذو المدار الإهليلجي المستقر الفضائي
+                if (i === 0) {
+                    theta = -Math.PI / 4; 
+                    initPos.set(
+                        pivotX + length * Math.sin(theta),
+                        CONFIG.PIVOT_Y - length * Math.cos(theta),
+                        1.8 
+                    );
+                    // قيد الطول الصارم للخيط هندسياً
+                    const currentLength = Math.sqrt(Math.pow(initPos.x - pivotX, 2) + Math.pow(initPos.y - CONFIG.PIVOT_Y, 2) + Math.pow(initPos.z, 2));
+                    initPos.sub(new THREE.Vector3(pivotX, CONFIG.PIVOT_Y, 0)).normalize().multiplyScalar(length).add(new THREE.Vector3(pivotX, CONFIG.PIVOT_Y, 0));
+                    // سرعة مدارية مماثلة متعامدة لإنشاء مسار ثلاثي الأبعاد هندسي دقيق
+                    initVel.set(0, 0, 3.2); 
+                }
+            }
+
+            if (this.anomalyCase !== 7) {
+                initPos.set(
+                    pivotX + length * Math.sin(theta),
+                    CONFIG.PIVOT_Y - length * Math.cos(theta),
+                    0
+                );
             }
 
             this.balls.push({
                 id: i,
                 pivotX,
                 theta,
-                omega: 0,
                 mass,
                 length,
-                pos: new THREE.Vector3(pivotX, CONFIG.PIVOT_Y - length, 0),
+                restitution,
+                magneticCharge,
+                gravityLocal,
+                pos: initPos.clone(),
+                vel: initVel.clone(),
+                force: new THREE.Vector3(0, 0, 0), // مجمع القوى اللحظي
                 ke: 0,
                 pe: 0
             });
@@ -63,9 +105,9 @@ export class AnomalousPhysicsEngine {
         let cumulativePE = 0;
 
         this.balls.forEach(ball => {
-            const linearVelocity = ball.omega * ball.length;
-            ball.ke = 0.5 * ball.mass * linearVelocity * linearVelocity;
-            ball.pe = ball.mass * CONFIG.GRAVITY * (ball.length - ball.length * Math.cos(ball.theta));
+            ball.ke = 0.5 * ball.mass * ball.vel.lengthSq();
+            const initialY = CONFIG.PIVOT_Y - ball.length;
+            ball.pe = ball.mass * ball.gravityLocal * (ball.pos.y - initialY);
 
             cumulativeKE += ball.ke;
             cumulativePE += ball.pe;
@@ -90,76 +132,98 @@ export class AnomalousPhysicsEngine {
         let frameImpulseDetected = false;
 
         for (let step = 0; step < CONFIG.PHYSICS_SUBSTEPS; step++) {
-            // 1. التكامل العددي المعزول لكل كرة
-            this.balls.forEach((ball) => {
-                if (ball.id === STATE.selectedId && STATE.isDragging) {
-                    ball.omega = 0;
-                } else {
-                    // العجلة الزاوية تعتمد على الطول الفعلي للكرة alpha = -(g/L)*sin(theta)
-                    const angularAcceleration = -(CONFIG.GRAVITY / ball.length) * Math.sin(ball.theta);
-                    ball.omega += angularAcceleration * subDeltaTime;
-
-                    if (!STATE.optConserve) ball.omega *= CONFIG.DAMPING_REAL;
-                    ball.theta += ball.omega * subDeltaTime;
-                }
-                ball.pos.set(
-                    ball.pivotX + ball.length * Math.sin(ball.theta),
-                    CONFIG.PIVOT_Y - ball.length * Math.cos(ball.theta),
-                    0
-                );
+            
+            // 1. تصفير وحساب القوى الخارجية والبينية (قوى الجاذبية والتنافر المغناطيسي)
+            this.balls.forEach(ball => {
+                ball.force.set(0, -ball.gravityLocal * ball.mass, 0);
             });
 
-            // 2. حل التصادمات المرنة لحساب الكتل المختلفة والأطوال المختلفة (Impulse Resolver)
+            if (this.anomalyCase === 5) {
+                for (let i = 0; i < CONFIG.N; i++) {
+                    for (let j = 0; j < CONFIG.N; j++) {
+                        if (i === j) continue;
+                        const b1 = this.balls[i];
+                        const b2 = this.balls[j];
+                        const toB1 = new THREE.Vector3().subVectors(b1.pos, b2.pos);
+                        const dist = toB1.length();
+                        
+                        if (dist > 0.05) {
+                            // قانون كولوم المغناطيسي ثنائي القطب النقي: F = (q1 * q2) / r^2
+                            const forceMag = (b1.magneticCharge * b2.magneticCharge) / (dist * dist);
+                            b1.force.addScaledVector(toB1.normalize(), forceMag);
+                        }
+                    }
+                }
+            }
+
+            // 2. التكامل الحركي المتجهي وتطبيق القيود الصلبة للبندول الكروي (Semi-implicit Verlet integration)
+            this.balls.forEach((ball) => {
+                if (ball.id === STATE.selectedId && STATE.isDragging) {
+                    ball.vel.set(0, 0, 0);
+                } else {
+                    // تحديث السرعة المبدئية بواسطة القوى المؤثرة: v = v + (F/m)*dt
+                    ball.vel.addScaledVector(ball.force, subDeltaTime / ball.mass);
+
+                    if (!STATE.optConserve) ball.vel.multiplyScalar(CONFIG.DAMPING_REAL);
+
+                    // تحديث الموقع الفضائي المبدئي: x = x + v*dt
+                    ball.pos.addScaledVector(ball.vel, subDeltaTime);
+
+                    // تطبيق قيد طول الخيط الصارم هندسياً من مركز التعليق (Pivot)
+                    const pivot = new THREE.Vector3(ball.pivotX, CONFIG.PIVOT_Y, 0);
+                    const toBall = new THREE.Vector3().subVectors(ball.pos, pivot);
+                    toBall.normalize();
+                    
+                    ball.pos.copy(pivot).addScaledVector(toBall, ball.length);
+
+                    // تصحيح السرعة المتجهية: القضاء على السرعة القطرية (Radial Velocity) الناتجة عن تمدد القيد
+                    // لتبقى حركة الكرة دائماً مماسية مائة بالمائة لسطح الكرة القيدية الفضائية
+                    const radialVel = ball.vel.dot(toBall);
+                    ball.vel.addScaledVector(toBall, -radialVel);
+                }
+
+                // تحديث الزاوية لإبقاء الرسوميات ثنائية الأبعاد متزامنة مع قراءة الطاقة والـ DOM
+                ball.theta = Math.atan2(ball.pos.x - ball.pivotX, CONFIG.PIVOT_Y - ball.pos.y);
+            });
+
+            // 3. حل التصادمات الميكانيكية الفضائية المرنة واللدنة (3D Impulse Solver Passes)
             for (let pass = 0; pass < 4; pass++) { 
                 for (let i = 0; i < CONFIG.N - 1; i++) {
                     const b1 = this.balls[i];
                     const b2 = this.balls[i + 1];
-                    const dx = b2.pos.x - b1.pos.x;
-                    const dy = b2.pos.y - b1.pos.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    const toNext = new THREE.Vector3().subVectors(b2.pos, b1.pos);
+                    const distance = toNext.length();
                     const minDist = CONFIG.R * 2;
 
                     if (distance < minDist) {
-                        // حل التداخل الميكانيكي الفوري
-                        const overlapTheta1 = ((minDist - distance) / b1.length);
-                        const overlapTheta2 = ((minDist - distance) / b2.length);
+                        const normal = toNext.normalize();
+                        const overlap = minDist - distance;
 
-                        if (i === STATE.selectedId && STATE.isDragging) {
-                            b2.theta += overlapTheta2;
-                        } else if (i + 1 === STATE.selectedId && STATE.isDragging) {
-                            b1.theta -= overlapTheta1;
-                        } else {
-                            // التوزيع بناء على نسبة الكتل لصحته ميكانيكياً
-                            const totalM = b1.mass + b2.mass;
-                            b1.theta -= overlapTheta1 * (b2.mass / totalM);
-                            b2.theta += overlapTheta2 * (b1.mass / totalM);
+                        // دفع هندسي فوري لتصحيح التداخل والازدحام المادي للكرات بناءً على القصور الذاتي للكتلة
+                        const totalM = b1.mass + b2.mass;
+                        if (!(i === STATE.selectedId && STATE.isDragging)) {
+                            b1.pos.addScaledVector(normal, -overlap * (b2.mass / totalM));
+                        }
+                        if (!(i + 1 === STATE.selectedId && STATE.isDragging)) {
+                            b2.pos.addScaledVector(normal, overlap * (b1.mass / totalM));
                         }
 
-                        b1.pos.set(b1.pivotX + b1.length * Math.sin(b1.theta), CONFIG.PIVOT_Y - b1.length * Math.cos(b1.theta), 0);
-                        b2.pos.set(b2.pivotX + b2.length * Math.sin(b2.theta), CONFIG.PIVOT_Y - b2.length * Math.cos(b2.theta), 0);
+                        // حساب مصفوفة نبض الارتداد على طول خط المركز التصادمي الناظم (Normal Line)
+                        const relativeVelocity = new THREE.Vector3().subVectors(b2.vel, b1.vel);
+                        const velAlongNormal = relativeVelocity.dot(normal);
 
-                        // حساب متجهات السرعة الخطية والتصادم المرن غير متساوي الكتل
-                        const normalX = dx / distance;
-                        const normalY = dy / distance;
-
-                        let v1x = b1.length * b1.omega * Math.cos(b1.theta);
-                        let v1y = b1.length * b1.omega * Math.sin(b1.theta);
-                        let v2x = b2.length * b2.omega * Math.cos(b2.theta);
-                        let v2y = b2.length * b2.omega * Math.sin(b2.theta);
-
-                        const relativeVelocityNormal = (v2x - v1x) * normalX + (v2y - v1y) * normalY;
-
-                        if (relativeVelocityNormal < 0) {
-                            const restitution = 1.0; 
-                            // معادلة النبض لكتل مختلفة: j = -(1+e)*Vrel / (1/m1 + 1/m2)
-                            const j = -(1 + restitution) * relativeVelocityNormal / (1 / b1.mass + 1 / b2.mass);
+                        // التصادم يتم برمجياً فقط إذا كانت الكرات تتقارب متجهياً
+                        if (velAlongNormal < 0) {
+                            const currentRestitution = Math.min(b1.restitution, b2.restitution);
+                            const j = -(1 + currentRestitution) * velAlongNormal / (1 / b1.mass + 1 / b2.mass);
 
                             if (Math.abs(j) > 0.15) {
                                 if (this.audio) {
                                     this.audio.playCollision({
                                         impulse: j,
                                         pos: b1.pos.clone().lerp(b2.pos, 0.5),
-                                        dir: b1.omega > 0 ? 1 : -1
+                                        dir: b1.vel.x > 0 ? 1 : -1
                                     });
                                 }
 
@@ -169,23 +233,18 @@ export class AnomalousPhysicsEngine {
                                         b1Id: i,
                                         b2Id: i + 1,
                                         pos: b1.pos.clone().lerp(b2.pos, 0.5),
-                                        normal: new THREE.Vector3(normalX, normalY, 0),
+                                        normal: normal.clone(),
                                         impulse: j,
-                                        v1_in: Math.sqrt(v1x * v1x + v1y * v1y) * Math.sign(b1.omega),
-                                        v2_in: Math.sqrt(v2x * v2x + v2y * v2y) * Math.sign(b2.omega),
-                                        dir: b1.omega > 0 ? 1 : -1
+                                        v1_in: b1.vel.dot(normal),
+                                        v2_in: b2.vel.dot(normal),
+                                        dir: b1.vel.x > 0 ? 1 : -1
                                     });
                                 }
                             }
 
-                            // تعديل السرعات بناءً على نبض التصادم والكتلة الفردية لكل كرة
-                            v1x -= (j / b1.mass) * normalX;
-                            v1y -= (j / b1.mass) * normalY;
-                            v2x += (j / b2.mass) * normalX;
-                            v2y += (j / b2.mass) * normalY;
-
-                            b1.omega = (v1x * Math.cos(b1.theta) + v1y * Math.sin(b1.theta)) / b1.length;
-                            b2.omega = (v2x * Math.cos(b2.theta) + v2y * Math.sin(b2.theta)) / b2.length;
+                            // حقن النبضات المتجهية في المحاور الثلاثة لتعديل اندفاع الكرات فجائياً
+                            b1.vel.addScaledVector(normal, -(j / b1.mass));
+                            b2.vel.addScaledVector(normal, (j / b2.mass));
                         }
                     }
                 }
@@ -193,14 +252,15 @@ export class AnomalousPhysicsEngine {
         }
 
         this.calculateEnergy();
-        if (STATE.optConserve && !STATE.isDragging && STATE.baselineEnergy > 0) {
-            // تثبيت خوارزمي متناسب مع الكتل الكلية للنظام الشاذ
+
+        // خوارزمية تصحيح وحفظ طاقة جملة الحالات الشاذة الميكانيكية (ما عدا حالة التخميد اللدن 4)
+        if (STATE.optConserve && !STATE.isDragging && STATE.baselineEnergy > 0 && this.anomalyCase !== 4) {
             const targetKE = STATE.baselineEnergy - STATE.sysPE;
             if (targetKE > 0 && STATE.sysKE > 0) {
                 const correctionRatio = Math.sqrt(targetKE / STATE.sysKE);
                 if (Math.abs(1.0 - correctionRatio) < 0.1) {
                     this.balls.forEach(ball => {
-                        if (Math.abs(ball.omega) > 0.01) ball.omega *= correctionRatio;
+                        ball.vel.multiplyScalar(correctionRatio);
                     });
                 }
             }

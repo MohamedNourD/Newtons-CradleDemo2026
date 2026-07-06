@@ -1,6 +1,5 @@
 import { MODES } from './config.js';
 
-// Reactive Global Application State
 export const STATE = {
     mode: MODES.REALISTIC,
     paused: false,
@@ -19,6 +18,6 @@ export const STATE = {
     optBars: true,
     optNet: true,
     graphMode: 'system',
-    isAnomalousMode: false,
+    isAnomalousMode: false, 
     activeAnomalyCase: 1
 };

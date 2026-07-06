@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { STATE } from './state.js';
 import { AudioEngine } from '../audio/audioEngine.js';
 import { PhysicsEngine } from '../physics/physicsEngine.js';
-import { AnomalousPhysicsEngine } from '../physics/anomalousPhysicsEngine.js'; // الاستيراد الجديد
+import { AnomalousPhysicsEngine } from '../physics/anomalousPhysicsEngine.js';
 import { RenderEngine } from '../render/renderEngine.js';
 import { Visualizer } from '../render/visualizer.js';
 import { UIManager } from '../ui/uiManager.js';
@@ -14,8 +14,6 @@ class App {
         window.audioEngine = this.audio;
 
         this.renderer = new RenderEngine();
-        
-        // التحديد الأولي للمحرك
         this.physics = new PhysicsEngine(this.audio);
         this.visuals = new Visualizer(this.renderer, this.physics);
         
@@ -24,20 +22,27 @@ class App {
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
         this.dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-
-        this.bindInput();
-        this.bindAnomalyUI(); // ربط الأزرار الجديدة لوجهتي النظر
+this.bindInput();
+        this.bindAnomalyUI(); 
         this.applyPreset(1);
+
+        // إيقاظ محرك الصوت فورا عند أول تحريك للماوس أو لمس للشاشة لضمان التقاط أول تصادم
+        const awakenAudio = () => {
+            if (this.audio) this.audio.resume();
+            window.removeEventListener('pointermove', awakenAudio);
+            window.removeEventListener('touchstart', awakenAudio);
+        };
+        window.addEventListener('pointermove', awakenAudio);
+        window.addEventListener('touchstart', awakenAudio);
 
         this.lastTime = performance.now();
         this.executeLoop();
-    }
+    } // نهاية الـ constructor
 
     switchLab(toAnomalous, caseId = 1) {
         STATE.isAnomalousMode = toAnomalous;
         STATE.activeAnomalyCase = caseId;
 
-        // 1. تنظيف المشهد القديم تماماً للكرات والخيوط لعدم تداخل البيانات
         this.visuals.entities.forEach(entity => {
             this.renderer.scene.remove(
                 entity.meshReal, entity.meshEnergy, entity.meshForce, entity.interact,
@@ -48,14 +53,12 @@ class App {
         });
         this.visuals.networkLinks.forEach(link => this.renderer.scene.remove(link.mesh));
 
-        // 2. إعادة إطلاق وحقن المحرك المناسب للمنطق الفيزيائي المعزول
         if (STATE.isAnomalousMode) {
             this.physics = new AnomalousPhysicsEngine(this.audio, caseId);
         } else {
             this.physics = new PhysicsEngine(this.audio);
         }
 
-        // 3. إعادة إحياء وبناء العناصر داخل المصير البصري وتحديث مراجع واجهة المستخدم
         this.visuals.physics = this.physics;
         this.visuals.entities = [];
         this.visuals.networkLinks = [];
@@ -69,16 +72,13 @@ class App {
             this.applyPreset(caseId); 
         }
     }
-bindAnomalyUI() {
+
+    bindAnomalyUI() {
         const btnStandardLab = document.getElementById('btn-std-lab');
         const btnAnomalyLab = document.getElementById('btn-anom-lab');
         const anomalySelectorGroup = document.getElementById('anomaly-cases-group');
 
-        // فحص آمن: إذا لم تكن الأزرار موجودة في الواجهة بعد، تخطى الربط حتى لا ينهار التطبيق
-        if (!btnStandardLab || !btnAnomalyLab || !anomalySelectorGroup) {
-            console.warn("عناصر تحكم الحالات الشاذة غير موجودة في ملف HTML الحالي.");
-            return; 
-        }
+        if (!btnStandardLab || !btnAnomalyLab || !anomalySelectorGroup) return; 
 
         btnStandardLab.onclick = () => {
             btnStandardLab.classList.add('active');
@@ -94,13 +94,25 @@ bindAnomalyUI() {
             this.switchLab(true, 1);
         };
 
-        const btnMass = document.getElementById('btn-case-mass');
-        const btnLengths = document.getElementById('btn-case-lengths');
-        const btnMotion = document.getElementById('btn-case-motion');
+        const cases = [
+            { id: 'btn-case-mass', num: 1 },
+            { id: 'btn-case-lengths', num: 2 },
+            { id: 'btn-case-motion', num: 3 },
+            { id: 'btn-case-damping', num: 4 },
+            { id: 'btn-case-magnetic', num: 5 },
+            { id: 'btn-case-gravity', num: 6 },
+            { id: 'btn-case-3d', num: 7 } // الحالة السابعة الجديدة ثلاثية الأبعاد
+        ];
 
-        if (btnMass) btnMass.onclick = (e) => { this.setActiveCaseBtn(e.target); this.switchLab(true, 1); };
-        if (btnLengths) btnLengths.onclick = (e) => { this.setActiveCaseBtn(e.target); this.switchLab(true, 2); };
-        if (btnMotion) btnMotion.onclick = (e) => { this.setActiveCaseBtn(e.target); this.switchLab(true, 3); };
+        cases.forEach(c => {
+            const btn = document.getElementById(c.id);
+            if (btn) {
+                btn.onclick = (e) => {
+                    this.setActiveCaseBtn(e.target);
+                    this.switchLab(true, c.num);
+                };
+            }
+        });
     }
 
     setActiveCaseBtn(activeBtn) {
@@ -108,8 +120,9 @@ bindAnomalyUI() {
         activeBtn.classList.add('active');
     }
 
-    applyPreset(count) {
-        if (STATE.isAnomalousMode) return; // الحالات الشاذة تحكم إحداثياتها من المحرك الخاص بها
+applyPreset(count) {
+        if (STATE.isAnomalousMode) return; 
+        
         this.physics.balls.forEach(ball => {
             ball.theta = 0;
             ball.omega = 0;
@@ -120,55 +133,46 @@ bindAnomalyUI() {
         }
 
         this.ui.history = [];
-        this.physics.calculateEnergy();
-        STATE.baselineEnergy = STATE.sysTotal;
+        
+        // الحل: تأخير حساب الطاقة المرجعية فريم واحد حتى تستقر زوايا وإحداثيات الكرات تماماً في المتصفح
+        requestAnimationFrame(() => {
+            this.physics.calculateEnergy();
+            STATE.baselineEnergy = STATE.sysTotal;
+        });
     }
 
     bindInput() {
         const updateRaycastIntersections = (event) => {
-            let clientX = event.clientX;
-            let clientY = event.clientY;
-
+            let clientX = event.clientX, clientY = event.clientY;
             if (event.touches && event.touches.length > 0) {
                 clientX = event.touches[0].clientX;
                 clientY = event.touches[0].clientY;
             }
-
             this.mouse.x = (clientX / window.innerWidth) * 2 - 1;
             this.mouse.y = -(clientY / window.innerHeight) * 2 + 1;
             this.raycaster.setFromCamera(this.mouse, this.renderer.camera);
-
             return this.raycaster.intersectObjects(this.visuals.entities.map(entity => entity.interact));
         };
 
         this.renderer.renderer.domElement.addEventListener('pointerdown', event => {
             if (window.audioEngine) window.audioEngine.resume();
-
             const intersectedHits = updateRaycastIntersections(event);
-
             if (intersectedHits.length > 0) {
                 STATE.selectedId = this.visuals.entities.findIndex(entity => entity.interact === intersectedHits[0].object);
                 STATE.isDragging = true;
                 this.renderer.controls.enabled = false;
                 this.ui.hideHint();
-
-                const elements = document.querySelectorAll('.data-item');
-                elements.forEach(el => el.classList.add('highlight'));
-                setTimeout(() => elements.forEach(el => el.classList.remove('highlight')), 300);
             }
         });
 
         this.renderer.renderer.domElement.addEventListener('pointermove', event => {
             if (!STATE.isDragging) return;
             updateRaycastIntersections(event);
-
             const intersectionPlaneVector = new THREE.Vector3();
             this.raycaster.ray.intersectPlane(this.dragPlane, intersectionPlaneVector);
-
             if (intersectionPlaneVector) {
                 const targetBall = this.physics.balls[STATE.selectedId];
                 let mappedAngle = Math.atan2(intersectionPlaneVector.x - targetBall.pivotX, CONFIG.PIVOT_Y - intersectionPlaneVector.y);
-
                 targetBall.theta = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, mappedAngle));
                 targetBall.omega = 0;
                 this.physics.calculateEnergy();
@@ -192,7 +196,6 @@ bindAnomalyUI() {
 
     executeLoop() {
         requestAnimationFrame(() => this.executeLoop());
-
         const currentTimestamp = performance.now();
         const deltaTime = Math.min((currentTimestamp - this.lastTime) / 1000, 0.05);
         this.lastTime = currentTimestamp;
@@ -200,7 +203,6 @@ bindAnomalyUI() {
         this.physics.step(1.0 / 60.0);
         this.visuals.update(deltaTime * STATE.timeScale);
         this.ui.updateDOM(currentTimestamp);
-
         this.renderer.controls.update();
         this.renderer.render();
     }

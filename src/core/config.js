@@ -1,4 +1,3 @@
-// Simulation Configuration & Environmental Constants
 export const CONFIG = {
     N: 5,
     R: 1.0,
@@ -13,6 +12,5 @@ export const CONFIG = {
     WAVE_SPEED: 40.0
 };
 
-// Application State Enums
 export const MODES = { REALISTIC: 1, ENERGY: 2, FORCES: 3, DEBUG: 4, SPLIT: 5 };
 export const LAYERS = { COMMON: 0, REAL: 1, ENERGY: 2, FORCES: 3, DEBUG: 4 };
