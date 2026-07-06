@@ -141,3 +141,48 @@ select.c-btn {
     padding-right: 16px; 
     text-align: center; 
 }
+/* أضف هذا الكود في نهاية ملف css/controls.css */
+#lab-navigator {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+}
+
+.anomaly-container {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    z-index: 90;
+}
+
+.anomaly-btn {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ccc;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.anomaly-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.anomaly-btn.active {
+    background: #ff00ff;
+    color: #fff;
+    border-color: #ff00ff;
+    box-shadow: 0 0 10px rgba(255, 0, 255, 0.4);
+}

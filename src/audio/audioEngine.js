@@ -10,8 +10,7 @@ export class AudioEngine {
         this.masterGain.gain.value = 0.7; // Headroom
         this.masterGain.connect(this.ctx.destination);
 
-        this.lastPlayTime = 0;
-        this.cooldown = 0.008; // 8ms cooldown for rapid sequential impacts
+const now = this.ctx.currentTime; //  النسخة الصحيحة        this.cooldown = 0.008; // 8ms cooldown for rapid sequential impacts
     }
 
     resume() {

@@ -18,5 +18,7 @@ export const STATE = {
     optForce: true,
     optBars: true,
     optNet: true,
-    graphMode: 'system'
+    graphMode: 'system',
+    isAnomalousMode: false,
+    activeAnomalyCase: 1
 };

@@ -212,19 +212,31 @@ export class Visualizer {
         });
     }
 
-    update(dt) {
+   update(dt) {
         this.physics.collisionEvents.forEach(event => {
             this.spawnDebugInfo(event);
             if (window.uiManager) window.uiManager.triggerEducationalOverlay(event);
         });
 
-        const maximumCalculatedPE = CONFIG.MASS * CONFIG.GRAVITY * (CONFIG.L - CONFIG.L * Math.cos(Math.PI / 4));
-
         this.physics.balls.forEach((ball, i) => {
             const entity = this.entities[i];
             const px = ball.pos.x, py = ball.pos.y, pz = ball.pos.z;
-            const velocity = ball.omega * CONFIG.L;
+            const velocity = ball.omega * (ball.length || CONFIG.L); // تعديل الطول الديناميكي
             const absoluteVelocity = Math.abs(velocity);
+
+            // تعديل ديناميكي لحجم كرات الأوزان المختلفة ميكانيكياً وبصرياً
+            if (ball.mass && ball.mass !== CONFIG.MASS) {
+                const scaleFactor = Math.cbrt(ball.mass / CONFIG.MASS);
+                entity.meshReal.scale.setScalar(scaleFactor);
+                entity.meshEnergy.scale.setScalar(scaleFactor);
+                entity.meshForce.scale.setScalar(scaleFactor);
+                entity.interact.scale.setScalar(scaleFactor);
+            } else {
+                entity.meshReal.scale.setScalar(1);
+                entity.meshEnergy.scale.setScalar(1);
+                entity.meshForce.scale.setScalar(1);
+                entity.interact.scale.setScalar(1);
+            }
 
             entity.interact.position.set(px, py, pz);
             entity.meshReal.position.set(px, py, pz);
@@ -241,18 +253,20 @@ export class Visualizer {
                 });
             });
 
-            entity.selRing.position.set(px, py, pz + CONFIG.R * 1.1);
+            // الاعتماد على نصف القطر الفعلي لـ الحالات العادية والشاذة
+            const currentR = CONFIG.R * (entity.meshReal.scale.x);
+            entity.selRing.position.set(px, py, pz + currentR * 1.1);
             entity.selRing.visible = (i === STATE.selectedId);
 
-            entity.meshEnergy.material.color.lerpColors(new THREE.Color(0x2244ff), new THREE.Color(0xff2222), Math.min(1, ball.ke / maximumCalculatedPE));
+            const maximumCalculatedPE = ball.mass * CONFIG.GRAVITY * ((ball.length || CONFIG.L) - (ball.length || CONFIG.L) * Math.cos(Math.PI / 4));
+            entity.meshEnergy.material.color.lerpColors(new THREE.Color(0x2244ff), new THREE.Color(0xff2222), Math.min(1, ball.ke / (maximumCalculatedPE || 1)));
 
             if (STATE.optBars) {
                 const scalarFactor = 0.1;
+                entity.peBar.position.set(px, py + currentR + 0.2, pz);
                 entity.peBar.scale.y = Math.max(0.01, ball.pe * scalarFactor);
-                entity.peBar.position.set(px, py + CONFIG.R + 0.2, pz);
-
+                entity.keBar.position.set(px, py + currentR + 0.2 + (ball.pe * scalarFactor), pz);
                 entity.keBar.scale.y = Math.max(0.01, ball.ke * scalarFactor);
-                entity.keBar.position.set(px, py + CONFIG.R + 0.2 + (ball.pe * scalarFactor), pz);
                 entity.peBar.visible = entity.keBar.visible = true;
             } else {
                 entity.peBar.visible = entity.keBar.visible = false;
@@ -271,7 +285,7 @@ export class Visualizer {
             }
 
             if (STATE.optMom) {
-                const momentumMagnitude = CONFIG.MASS * absoluteVelocity;
+                const momentumMagnitude = ball.mass * absoluteVelocity;
                 entity.arrMom.setDirection(forwardVector);
                 entity.arrMom.setLength(Math.max(0.01, momentumMagnitude * 0.5), momentumMagnitude > 0.1 ? 0.4 : 0, momentumMagnitude > 0.1 ? 0.25 : 0);
                 entity.arrMom.position.set(px, py - 0.2, pz + 0.2);
@@ -282,10 +296,10 @@ export class Visualizer {
 
             if (STATE.optForce) {
                 entity.arrGrav.setDirection(new THREE.Vector3(0, -1, 0));
-                entity.arrGrav.setLength(CONFIG.GRAVITY * 0.15, 0.3, 0.2);
+                entity.arrGrav.setLength(ball.mass * CONFIG.GRAVITY * 0.15, 0.3, 0.2);
                 entity.arrGrav.position.set(px, py, pz);
 
-                const tensionMagnitude = CONFIG.MASS * CONFIG.GRAVITY * Math.cos(ball.theta) + CONFIG.MASS * absoluteVelocity * absoluteVelocity / CONFIG.L;
+                const tensionMagnitude = ball.mass * CONFIG.GRAVITY * Math.cos(ball.theta) + ball.mass * absoluteVelocity * absoluteVelocity / ball.length;
                 const distPivotX = ball.pivotX - px;
                 const distPivotY = CONFIG.PIVOT_Y - py;
                 const vectorHypot = Math.sqrt(distPivotX * distPivotX + distPivotY * distPivotY);
@@ -302,6 +316,7 @@ export class Visualizer {
             entity.glow.visible = false;
         });
 
+        // المزامنة الإضافية للموجات والشبكة
         this.networkLinks.forEach(link => link.intensity = 0);
 
         for (let i = this.travelingWaves.length - 1; i >= 0; i--) {
@@ -360,7 +375,7 @@ export class Visualizer {
             item.cp.material.opacity = item.life;
 
             if (item.life <= 0) {
-                this.scene.remove(item.label, item.cp, item.arr);
+                this.scene.remove(item.label, item.cp);
                 item.label.material.map.dispose();
                 item.label.material.dispose();
                 item.cp.material.dispose();

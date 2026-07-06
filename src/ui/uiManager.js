@@ -240,7 +240,12 @@ export class UIManager {
 
             this.dom.sDev.innerText = (errorMargin > 0 ? '+' : '') + errorMargin.toFixed(4) + ' %';
             this.dom.sDev.className = 'data-value ' + (Math.abs(errorMargin) > 0.05 ? (Math.abs(errorMargin) > 0.5 ? 'error-value' : 'warn-value') : 'exact-match');
-        } else {
+        }// داخل الدالة updateDOM(currentTime) بعد إخراج البيانات:
+        if(targetBall.mass) {
+            this.dom.vel.innerHTML = Math.abs(linearVelocity).toFixed(3) + ' m/s <small style="color:#aaa">(' + targetBall.mass.toFixed(1) + 'kg)</small>';
+            this.dom.theta.innerHTML = (targetBall.theta * 180 / Math.PI).toFixed(2) + '° <small style="color:#aaa">(' + (targetBall.length).toFixed(1) + 'm)</small>';
+        }
+         else {
             this.dom.devCont.style.display = 'none';
         }
     }
