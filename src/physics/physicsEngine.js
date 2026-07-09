@@ -135,7 +135,6 @@ export class PhysicsEngine {
                                         dir: b1.omega > 0 ? 1 : -1
                                     });
                                 }
-
                                 if (!frameImpulseDetected) {
                                     frameImpulseDetected = true;
                                     this.collisionEvents.push({

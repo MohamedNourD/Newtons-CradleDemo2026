@@ -16,14 +16,14 @@ class App {
         this.renderer = new RenderEngine();
         this.physics = new PhysicsEngine(this.audio);
         this.visuals = new Visualizer(this.renderer, this.physics);
-        
+
         window.uiManager = this.ui = new UIManager(this.physics);
-        
+
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
         this.dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-this.bindInput();
-        this.bindAnomalyUI(); 
+        this.bindInput();
+        this.bindAnomalyUI();
         this.applyPreset(1);
 
         // إيقاظ محرك الصوت فورا عند أول تحريك للماوس أو لمس للشاشة لضمان التقاط أول تصادم
@@ -69,7 +69,7 @@ this.bindInput();
         STATE.selectedId = 0;
 
         if (!STATE.isAnomalousMode) {
-            this.applyPreset(caseId); 
+            this.applyPreset(caseId);
         }
     }
 
@@ -78,7 +78,7 @@ this.bindInput();
         const btnAnomalyLab = document.getElementById('btn-anom-lab');
         const anomalySelectorGroup = document.getElementById('anomaly-cases-group');
 
-        if (!btnStandardLab || !btnAnomalyLab || !anomalySelectorGroup) return; 
+        if (!btnStandardLab || !btnAnomalyLab || !anomalySelectorGroup) return;
 
         btnStandardLab.onclick = () => {
             btnStandardLab.classList.add('active');
@@ -120,9 +120,9 @@ this.bindInput();
         activeBtn.classList.add('active');
     }
 
-applyPreset(count) {
-        if (STATE.isAnomalousMode) return; 
-        
+    applyPreset(count) {
+        if (STATE.isAnomalousMode) return;
+
         this.physics.balls.forEach(ball => {
             ball.theta = 0;
             ball.omega = 0;
@@ -133,7 +133,7 @@ applyPreset(count) {
         }
 
         this.ui.history = [];
-        
+
         // الحل: تأخير حساب الطاقة المرجعية فريم واحد حتى تستقر زوايا وإحداثيات الكرات تماماً في المتصفح
         requestAnimationFrame(() => {
             this.physics.calculateEnergy();
@@ -188,7 +188,7 @@ applyPreset(count) {
             this.renderer.controls.enabled = true;
         });
 
-        document.getElementById('btn-reset').onclick = () => { if (window.audioEngine) window.audioEngine.resume(); if(STATE.isAnomalousMode){ this.physics.initCase(); }else{ this.applyPreset(0); } };
+        document.getElementById('btn-reset').onclick = () => { if (window.audioEngine) window.audioEngine.resume(); if (STATE.isAnomalousMode) { this.physics.initCase(); } else { this.applyPreset(0); } };
         document.getElementById('btn-demo1').onclick = () => { if (window.audioEngine) window.audioEngine.resume(); this.applyPreset(1); };
         document.getElementById('btn-demo2').onclick = () => { if (window.audioEngine) window.audioEngine.resume(); this.applyPreset(2); };
         document.getElementById('btn-demo3').onclick = () => { if (window.audioEngine) window.audioEngine.resume(); this.applyPreset(3); };

@@ -211,177 +211,184 @@ export class Visualizer {
             energy: event.impulse
         });
     }
+update(dt) {
+    this.physics.collisionEvents.forEach(event => {
+        this.spawnDebugInfo(event);
+        if (window.uiManager) window.uiManager.triggerEducationalOverlay(event);
+    });
 
-   update(dt) {
-        this.physics.collisionEvents.forEach(event => {
-            this.spawnDebugInfo(event);
-            if (window.uiManager) window.uiManager.triggerEducationalOverlay(event);
-        });
+    this.physics.balls.forEach((ball, i) => {
+        const entity = this.entities[i];
+        const px = ball.pos.x, py = ball.pos.y, pz = ball.pos.z;
+        
+        // ✨ تحديد الكتلة والطول بشكل آمن لتفادي قيم undefined في البيئة القياسية
+        const currentMass = ball.mass !== undefined ? ball.mass : CONFIG.MASS;
+        const currentLength = ball.length !== undefined ? ball.length : CONFIG.L;
 
-        this.physics.balls.forEach((ball, i) => {
-            const entity = this.entities[i];
-            const px = ball.pos.x, py = ball.pos.y, pz = ball.pos.z;
-            const velocity = ball.omega * (ball.length || CONFIG.L); // تعديل الطول الديناميكي
-            const absoluteVelocity = Math.abs(velocity);
+        const velocity = ball.omega * currentLength; // تعديل الطول الديناميكي الآمن
+        const absoluteVelocity = Math.abs(velocity);
 
-            // تعديل ديناميكي لحجم كرات الأوزان المختلفة ميكانيكياً وبصرياً
-            if (ball.mass && ball.mass !== CONFIG.MASS) {
-                const scaleFactor = Math.cbrt(ball.mass / CONFIG.MASS);
-                entity.meshReal.scale.setScalar(scaleFactor);
-                entity.meshEnergy.scale.setScalar(scaleFactor);
-                entity.meshForce.scale.setScalar(scaleFactor);
-                entity.interact.scale.setScalar(scaleFactor);
-            } else {
-                entity.meshReal.scale.setScalar(1);
-                entity.meshEnergy.scale.setScalar(1);
-                entity.meshForce.scale.setScalar(1);
-                entity.interact.scale.setScalar(1);
-            }
-
-            entity.interact.position.set(px, py, pz);
-            entity.meshReal.position.set(px, py, pz);
-            entity.meshEnergy.position.set(px, py, pz);
-            entity.meshForce.position.set(px, py, pz);
-
-            entity.strings.forEach((stringGroup, side) => {
-                const offsetZ = side === 0 ? -CONFIG.SPREAD : CONFIG.SPREAD;
-                stringGroup.forEach(line => {
-                    const positions = line.geometry.attributes.position.array;
-                    positions[0] = ball.pivotX; positions[1] = CONFIG.PIVOT_Y; positions[2] = offsetZ;
-                    positions[3] = px; positions[4] = py; positions[5] = pz;
-                    line.geometry.attributes.position.needsUpdate = true;
-                });
-            });
-
-            // الاعتماد على نصف القطر الفعلي لـ الحالات العادية والشاذة
-            const currentR = CONFIG.R * (entity.meshReal.scale.x);
-            entity.selRing.position.set(px, py, pz + currentR * 1.1);
-            entity.selRing.visible = (i === STATE.selectedId);
-
-            const maximumCalculatedPE = ball.mass * CONFIG.GRAVITY * ((ball.length || CONFIG.L) - (ball.length || CONFIG.L) * Math.cos(Math.PI / 4));
-            entity.meshEnergy.material.color.lerpColors(new THREE.Color(0x2244ff), new THREE.Color(0xff2222), Math.min(1, ball.ke / (maximumCalculatedPE || 1)));
-
-            if (STATE.optBars) {
-                const scalarFactor = 0.1;
-                entity.peBar.position.set(px, py + currentR + 0.2, pz);
-                entity.peBar.scale.y = Math.max(0.01, ball.pe * scalarFactor);
-                entity.keBar.position.set(px, py + currentR + 0.2 + (ball.pe * scalarFactor), pz);
-                entity.keBar.scale.y = Math.max(0.01, ball.ke * scalarFactor);
-                entity.peBar.visible = entity.keBar.visible = true;
-            } else {
-                entity.peBar.visible = entity.keBar.visible = false;
-            }
-
-            const headingDirection = Math.sign(ball.omega) || 1;
-            const forwardVector = new THREE.Vector3(Math.cos(ball.theta) * headingDirection, Math.sin(ball.theta) * headingDirection, 0);
-
-            if (STATE.optVel) {
-                entity.arrVel.setDirection(forwardVector);
-                entity.arrVel.setLength(Math.max(0.01, absoluteVelocity * 0.4), absoluteVelocity > 0.1 ? 0.3 : 0, absoluteVelocity > 0.1 ? 0.2 : 0);
-                entity.arrVel.position.set(px, py, pz);
-                entity.arrVel.visible = true;
-            } else {
-                entity.arrVel.visible = false;
-            }
-
-            if (STATE.optMom) {
-                const momentumMagnitude = ball.mass * absoluteVelocity;
-                entity.arrMom.setDirection(forwardVector);
-                entity.arrMom.setLength(Math.max(0.01, momentumMagnitude * 0.5), momentumMagnitude > 0.1 ? 0.4 : 0, momentumMagnitude > 0.1 ? 0.25 : 0);
-                entity.arrMom.position.set(px, py - 0.2, pz + 0.2);
-                entity.arrMom.visible = true;
-            } else {
-                entity.arrMom.visible = false;
-            }
-
-            if (STATE.optForce) {
-                entity.arrGrav.setDirection(new THREE.Vector3(0, -1, 0));
-                entity.arrGrav.setLength(ball.mass * CONFIG.GRAVITY * 0.15, 0.3, 0.2);
-                entity.arrGrav.position.set(px, py, pz);
-
-                const tensionMagnitude = ball.mass * CONFIG.GRAVITY * Math.cos(ball.theta) + ball.mass * absoluteVelocity * absoluteVelocity / ball.length;
-                const distPivotX = ball.pivotX - px;
-                const distPivotY = CONFIG.PIVOT_Y - py;
-                const vectorHypot = Math.sqrt(distPivotX * distPivotX + distPivotY * distPivotY);
-
-                entity.arrTens.setDirection(new THREE.Vector3(distPivotX / vectorHypot, distPivotY / vectorHypot, 0));
-                entity.arrTens.setLength(tensionMagnitude * 0.15, 0.3, 0.2);
-                entity.arrTens.position.set(px, py, pz);
-                entity.arrGrav.visible = entity.arrTens.visible = true;
-            } else {
-                entity.arrGrav.visible = entity.arrTens.visible = false;
-            }
-
-            entity.meshForce.material.opacity = 0.2 + 0.8 * Math.min(1, absoluteVelocity / 1.5);
-            entity.glow.visible = false;
-        });
-
-        // المزامنة الإضافية للموجات والشبكة
-        this.networkLinks.forEach(link => link.intensity = 0);
-
-        for (let i = this.travelingWaves.length - 1; i >= 0; i--) {
-            let wave = this.travelingWaves[i];
-            wave.xPos += wave.dir * CONFIG.WAVE_SPEED * dt;
-
-            if (wave.xPos > this.physics.balls[CONFIG.N - 1].pivotX + CONFIG.D || wave.xPos < this.physics.balls[0].pivotX - CONFIG.D) {
-                this.travelingWaves.splice(i, 1);
-                continue;
-            }
-
-            this.physics.balls.forEach((ball, idx) => {
-                const distanceDelta = Math.abs(ball.pos.x - wave.xPos);
-                if (distanceDelta < CONFIG.R * 1.5 && STATE.optNet) {
-                    const targetEntity = this.entities[idx];
-                    targetEntity.glow.position.copy(ball.pos);
-                    targetEntity.glow.material.opacity = (1.0 - (distanceDelta / (CONFIG.R * 1.5))) * Math.min(1, wave.energy);
-                    targetEntity.glow.visible = true;
-                }
-            });
-
-            this.networkLinks.forEach((link, idx) => {
-                const b1 = this.physics.balls[idx];
-                const b2 = this.physics.balls[idx + 1];
-                const midpointX = (b1.pos.x + b2.pos.x) / 2;
-                const distanceDelta = Math.abs(midpointX - wave.xPos);
-
-                if (distanceDelta < CONFIG.D) {
-                    link.intensity = Math.max(link.intensity, 1.0 - (distanceDelta / CONFIG.D));
-                }
-            });
+        // تعديل ديناميكي لحجم كرات الأوزان المختلفة ميكانيكياً وبصرياً
+        if (ball.mass && ball.mass !== CONFIG.MASS) {
+            const scaleFactor = Math.cbrt(ball.mass / CONFIG.MASS);
+            entity.meshReal.scale.setScalar(scaleFactor);
+            entity.meshEnergy.scale.setScalar(scaleFactor);
+            entity.meshForce.scale.setScalar(scaleFactor);
+            entity.interact.scale.setScalar(scaleFactor);
+        } else {
+            entity.meshReal.scale.setScalar(1);
+            entity.meshEnergy.scale.setScalar(1);
+            entity.meshForce.scale.setScalar(1);
+            entity.interact.scale.setScalar(1);
         }
 
-        this.networkLinks.forEach((link, i) => {
-            const b1 = this.physics.balls[i];
-            const b2 = this.physics.balls[i + 1];
-            const currentDistance = b1.pos.distanceTo(b2.pos);
+        entity.interact.position.set(px, py, pz);
+        entity.meshReal.position.set(px, py, pz);
+        entity.meshEnergy.position.set(px, py, pz);
+        entity.meshForce.position.set(px, py, pz);
 
-            link.mesh.position.copy(b1.pos).lerp(b2.pos, 0.5);
-            link.mesh.lookAt(b2.pos);
+        entity.strings.forEach((stringGroup, side) => {
+            const offsetZ = side === 0 ? -CONFIG.SPREAD : CONFIG.SPREAD;
+            stringGroup.forEach(line => {
+                const positions = line.geometry.attributes.position.array;
+                positions[0] = ball.pivotX; positions[1] = CONFIG.PIVOT_Y; positions[2] = offsetZ;
+                positions[3] = px; positions[4] = py; positions[5] = pz;
+                line.geometry.attributes.position.needsUpdate = true;
+            });
+        });
 
-            if (STATE.optNet) {
-                link.mesh.scale.set(1 + link.intensity * 3, 1 + link.intensity * 3, currentDistance);
-                link.mesh.material.opacity = 0.1 + link.intensity * 0.8;
-                link.mesh.visible = true;
-            } else {
-                link.mesh.visible = false;
+        // الاعتماد على نصف القطر الفعلي لـ الحالات العادية والشاذة
+        const currentR = CONFIG.R * (entity.meshReal.scale.x);
+        entity.selRing.position.set(px, py, pz + currentR * 1.1);
+        entity.selRing.visible = (i === STATE.selectedId);
+
+        const maximumCalculatedPE = currentMass * CONFIG.GRAVITY * (currentLength - currentLength * Math.cos(Math.PI / 4));
+        entity.meshEnergy.material.color.lerpColors(new THREE.Color(0x2244ff), new THREE.Color(0xff2222), Math.min(1, ball.ke / (maximumCalculatedPE || 1)));
+
+        if (STATE.optBars) {
+            const scalarFactor = 0.1;
+            entity.peBar.position.set(px, py + currentR + 0.2, pz);
+            entity.peBar.scale.y = Math.max(0.01, ball.pe * scalarFactor);
+            entity.keBar.position.set(px, py + currentR + 0.2 + (ball.pe * scalarFactor), pz);
+            entity.keBar.scale.y = Math.max(0.01, ball.ke * scalarFactor);
+            entity.peBar.visible = entity.keBar.visible = true;
+        } else {
+            entity.peBar.visible = entity.keBar.visible = false;
+        }
+
+        const headingDirection = Math.sign(ball.omega) || 1;
+        const forwardVector = new THREE.Vector3(Math.cos(ball.theta) * headingDirection, Math.sin(ball.theta) * headingDirection, 0);
+
+        if (STATE.optVel) {
+            entity.arrVel.setDirection(forwardVector);
+            entity.arrVel.setLength(Math.max(0.01, absoluteVelocity * 0.4), absoluteVelocity > 0.1 ? 0.3 : 0, absoluteVelocity > 0.1 ? 0.2 : 0);
+            entity.arrVel.position.set(px, py, pz);
+            entity.arrVel.visible = true;
+        } else {
+            entity.arrVel.visible = false;
+        }
+
+        if (STATE.optMom) {
+            // ✨ تعديل: حساب الزخم باستخدام الكتلة المضمونة المحدثة
+            const momentumMagnitude = currentMass * absoluteVelocity;
+            entity.arrMom.setDirection(forwardVector);
+            entity.arrMom.setLength(Math.max(0.01, momentumMagnitude * 0.5), momentumMagnitude > 0.1 ? 0.4 : 0, momentumMagnitude > 0.1 ? 0.25 : 0);
+            entity.arrMom.position.set(px, py - 0.2, pz + 0.2);
+            entity.arrMom.visible = true;
+        } else {
+            entity.arrMom.visible = false;
+        }
+
+        if (STATE.optForce) {
+            // ✨ تعديل: حساب متجه الجاذبية الأرضية بشكل آمن
+            entity.arrGrav.setDirection(new THREE.Vector3(0, -1, 0));
+            entity.arrGrav.setLength(currentMass * CONFIG.GRAVITY * 0.15, 0.3, 0.2);
+            entity.arrGrav.position.set(px, py, pz);
+
+            // ✨ تعديل: حساب قوة الشد الحركي للخيط بشكل آمن ومقاوم للـ NaN
+            const tensionMagnitude = currentMass * CONFIG.GRAVITY * Math.cos(ball.theta) + currentMass * absoluteVelocity * absoluteVelocity / currentLength;
+            const distPivotX = ball.pivotX - px;
+            const distPivotY = CONFIG.PIVOT_Y - py;
+            const vectorHypot = Math.sqrt(distPivotX * distPivotX + distPivotY * distPivotY);
+
+            entity.arrTens.setDirection(new THREE.Vector3(distPivotX / vectorHypot, distPivotY / vectorHypot, 0));
+            entity.arrTens.setLength(tensionMagnitude * 0.15, 0.3, 0.2);
+            entity.arrTens.position.set(px, py, pz);
+            entity.arrGrav.visible = entity.arrTens.visible = true;
+        } else {
+            entity.arrGrav.visible = entity.arrTens.visible = false;
+        }
+
+        entity.meshForce.material.opacity = 0.2 + 0.8 * Math.min(1, absoluteVelocity / 1.5);
+        entity.glow.visible = false;
+    });
+
+    // المزامنة الإضافية للموجات والشبكة
+    this.networkLinks.forEach(link => link.intensity = 0);
+
+    for (let i = this.travelingWaves.length - 1; i >= 0; i--) {
+        let wave = this.travelingWaves[i];
+        wave.xPos += wave.dir * CONFIG.WAVE_SPEED * dt;
+
+        if (wave.xPos > this.physics.balls[CONFIG.N - 1].pivotX + CONFIG.D || wave.xPos < this.physics.balls[0].pivotX - CONFIG.D) {
+            this.travelingWaves.splice(i, 1);
+            continue;
+        }
+
+        this.physics.balls.forEach((ball, idx) => {
+            const distanceDelta = Math.abs(ball.pos.x - wave.xPos);
+            if (distanceDelta < CONFIG.R * 1.5 && STATE.optNet) {
+                const targetEntity = this.entities[idx];
+                targetEntity.glow.position.copy(ball.pos);
+                targetEntity.glow.material.opacity = (1.0 - (distanceDelta / (CONFIG.R * 1.5))) * Math.min(1, wave.energy);
+                targetEntity.glow.visible = true;
             }
         });
 
-        for (let i = this.textPool.length - 1; i >= 0; i--) {
-            let item = this.textPool[i];
-            item.life -= dt;
-            item.label.position.y += dt * 0.5;
-            item.label.material.opacity = item.life;
-            item.cp.material.opacity = item.life;
+        this.networkLinks.forEach((link, idx) => {
+            const b1 = this.physics.balls[idx];
+            const b2 = this.physics.balls[idx + 1];
+            const midpointX = (b1.pos.x + b2.pos.x) / 2;
+            const distanceDelta = Math.abs(midpointX - wave.xPos);
 
-            if (item.life <= 0) {
-                this.scene.remove(item.label, item.cp);
-                item.label.material.map.dispose();
-                item.label.material.dispose();
-                item.cp.material.dispose();
-                item.cp.geometry.dispose();
-                this.textPool.splice(i, 1);
+            if (distanceDelta < CONFIG.D) {
+                link.intensity = Math.max(link.intensity, 1.0 - (distanceDelta / CONFIG.D));
             }
+        });
+    }
+
+    this.networkLinks.forEach((link, i) => {
+        const b1 = this.physics.balls[i];
+        const b2 = this.physics.balls[i + 1];
+        const currentDistance = b1.pos.distanceTo(b2.pos);
+
+        link.mesh.position.copy(b1.pos).lerp(b2.pos, 0.5);
+        link.mesh.lookAt(b2.pos);
+
+        if (STATE.optNet) {
+            link.mesh.scale.set(1 + link.intensity * 3, 1 + link.intensity * 3, currentDistance);
+            link.mesh.material.opacity = 0.1 + link.intensity * 0.8;
+            link.mesh.visible = true;
+        } else {
+            link.mesh.visible = false;
+        }
+    });
+
+    for (let i = this.textPool.length - 1; i >= 0; i--) {
+        let item = this.textPool[i];
+        item.life -= dt;
+        item.label.position.y += dt * 0.5;
+        item.label.material.opacity = item.life;
+        item.cp.material.opacity = item.life;
+
+        if (item.life <= 0) {
+            this.scene.remove(item.label, item.cp);
+            item.label.material.map.dispose();
+            item.label.material.dispose();
+            item.cp.material.dispose();
+            item.cp.geometry.dispose();
+            this.textPool.splice(i, 1);
         }
     }
+}
 }

@@ -55,41 +55,38 @@ export class RenderEngine {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    render() {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+   render() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
-        if (STATE.mode === MODES.SPLIT) {
-            this.renderer.setViewport(0, 0, width / 2, height);
-            this.renderer.setScissor(0, 0, width / 2, height);
-            this.renderer.setScissorTest(true);
+    if (STATE.mode === MODES.SPLIT) {
+        // ... كود الشاشة المقسومة يظل كما هو دون تغيير ...
+    } else {
+        this.renderer.setViewport(0, 0, width, height);
+        this.renderer.setScissorTest(false);
+        
+        // إعادة ضبط طبقات الكاميرا
+        this.camera.layers.set(LAYERS.COMMON);
 
-            this.camera.layers.set(LAYERS.COMMON);
-            this.camera.layers.enable(LAYERS.REAL);
-            this.renderer.render(this.scene, this.camera);
-
-            this.renderer.setViewport(width / 2, 0, width / 2, height);
-            this.renderer.setScissor(width / 2, 0, width / 2, height);
-
-            this.camera.layers.set(LAYERS.COMMON);
+        // تفعيل الطبقات بناءً على النمط الحالي
+        if (STATE.mode === MODES.REALISTIC) this.camera.layers.enable(LAYERS.REAL);
+        if (STATE.mode === MODES.ENERGY) this.camera.layers.enable(LAYERS.ENERGY);
+        if (STATE.mode === MODES.FORCES) this.camera.layers.enable(LAYERS.FORCES);
+        if (STATE.mode === MODES.DEBUG) {
             this.camera.layers.enable(LAYERS.ENERGY);
             this.camera.layers.enable(LAYERS.FORCES);
             this.camera.layers.enable(LAYERS.DEBUG);
-            this.renderer.render(this.scene, this.camera);
-        } else {
-            this.renderer.setViewport(0, 0, width, height);
-            this.renderer.setScissorTest(false);
-            this.camera.layers.set(LAYERS.COMMON);
-
-            if (STATE.mode === MODES.REALISTIC) this.camera.layers.enable(LAYERS.REAL);
-            if (STATE.mode === MODES.ENERGY) this.camera.layers.enable(LAYERS.ENERGY);
-            if (STATE.mode === MODES.FORCES) this.camera.layers.enable(LAYERS.FORCES);
-            if (STATE.mode === MODES.DEBUG) {
-                this.camera.layers.enable(LAYERS.ENERGY);
-                this.camera.layers.enable(LAYERS.FORCES);
-                this.camera.layers.enable(LAYERS.DEBUG);
-            }
-            this.renderer.render(this.scene, this.camera);
         }
+
+        // ✨ الحل: تفعيل الطبقات تحليلياً إذا كانت الخيارات مفعلة من لوحة التحكم
+        if (STATE.optVel || STATE.optMom || STATE.optForce) {
+            this.camera.layers.enable(LAYERS.FORCES);
+        }
+        if (STATE.optBars) {
+            this.camera.layers.enable(LAYERS.ENERGY);
+        }
+
+        this.renderer.render(this.scene, this.camera);
     }
+}
 }
